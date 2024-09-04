@@ -1,3 +1,5 @@
+import datetime
+
 menu = """
 
 [d] Depositar
@@ -11,7 +13,8 @@ saldo         = 0
 limiteDeSaque = 500
 extrato       = ""
 numero_saques = 0
-LIMITE_SAQUES = 3
+LIMITE_SAQUES = 10
+dataEHora     =  datetime.datetime.fromisoformat('0001-01-01')
 
 def excedeuQtdeLimiteDeSaques(qtdeSaque):
     excedeu = qtdeSaque == LIMITE_SAQUES
@@ -34,21 +37,35 @@ def transacoes(opcao, valor):
     else:
         saldo -= valor   
 
-def atualizarExtrato(opcao, valor):
+def atualizarExtrato(opcao, valor, data_E_Hora):    
     global extrato
-    global numero_saques
+    global numero_saques    
+    global dataEHora 
+    dataEHora = data_E_Hora
+    
+    texto = ""
 
     if opcao == "d":
-        extrato += f"Depósito: R$ {valor:.2f}\n"
+        texto = "Depósito: R$ "
     else:
-        extrato += f"Saque: R$ {valor:.2f}\n"
+        texto = "Saque: R$ "
+
+    dt = data_E_Hora.strftime("%d/%m/%Y %H:%M")        
+
+    extrato += f"{texto} {valor:.2f}  {dt}\n"        
+    
+    if(data_E_Hora.date() != dataEHora.date()):
+        numero_saques = 1
+    else:
         numero_saques += 1
 
 def imprimirExtrato():
-    print("\n================ EXTRATO ================")
+    print("\n================= EXTRATO =================")
     print("Não foram realizadas movimentações." if not extrato else extrato)
+    print(f"Limite de transações por dia dia: {LIMITE_SAQUES}.")
+    print(f"Quantidade de transações efetuados no dia: {numero_saques}.")
     print(f"\nSaldo: R$ {saldo:.2f}")
-    print("==========================================")
+    print("=============================================")
         
 def sair():
     exit()
@@ -75,8 +92,13 @@ while True:
                 print(f"O valor excede o limite do saldo em  R$ {valor - saldo}.")
                 continue    
 
+        print(dataEHora.date())
         transacoes(opcao, valor)
-        atualizarExtrato(opcao, valor)
+                
+        dataEHoraAtual = datetime.datetime.today()
+        print(dataEHoraAtual.date())
+
+        atualizarExtrato(opcao, valor, dataEHoraAtual)
 
     elif opcao == "e":
         imprimirExtrato() 
@@ -86,4 +108,3 @@ while True:
 
     else:
         print("Opção inválida. Informe uma das opções do menu para efetuar transações ou sair.")        
-      
