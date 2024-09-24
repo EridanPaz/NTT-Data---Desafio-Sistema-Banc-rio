@@ -62,6 +62,7 @@ class Historico:
 
 class Conta:
 	def __init__(self, numero, cliente):
+		self.saldo		= 0
 		self.numero 	= numero
 		self.agencia 	= "0001"
 		self.cliente  	= cliente
