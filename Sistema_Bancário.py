@@ -1,110 +1,186 @@
-import datetime
+from abc import ABC, abstractmethod
+from datetime import datetime
+import textwrap
 
-menu = """
+class Transacao(ABC):
+	@property
+	def valor(self):
+		pass
 
-[d] Depositar
-[s] Sacar
-[e] Extrato
-[q] Sair
+	@abstractmethod
+	def registrar(self, conta):
+		pass
+   
 
-=> """
+class Saque(Transacao):
+	def __init__(self, valor):
+		self.valor = valor
 
-saldo         = 0
-limiteDeSaque = 500
-extrato       = ""
-numero_saques = 0
-LIMITE_SAQUES = 10
-dataEHora     =  datetime.datetime.fromisoformat('0001-01-01')
+	@property
+	def valor(self):
+		return self._valor
+	
+	def registrar(self, conta):
+		transacao_realizada_com_sucesso = conta.sacar(self.valor)
 
-def excedeuQtdeLimiteDeSaques(qtdeSaque):
-    excedeu = qtdeSaque == LIMITE_SAQUES
-    return excedeu
+		if transacao_realizada_com_sucesso:
+			conta.historico.adicionar_transacao(self)
 
-def excedeOValorLimiteDeSaque(valor):
-    excedeuLimite = valor > limiteDeSaque
 
-    return excedeuLimite
+class Deposito(Transacao):
+	def __init__(self, valor):
+		self.valor = valor
 
-def excedeOValorDoSaldo(valor):
-    excedeuLimite = valor > saldo
+	@property
+	def valor(self):
+		return self._valor
+	
+	def registrar(self, conta):
+		transacao_realizada_com_sucesso = conta.depositar(self.valor)
 
-    return excedeuLimite
+		if transacao_realizada_com_sucesso:
+			conta.historico.adicionar_transacao(self)
+		
 
-def transacoes(opcao, valor):
-    global saldo
-    if opcao == "d":
-        saldo += valor
-    else:
-        saldo -= valor   
+class Historico:
+	def __init__(self):
+		self._transacoes = []
+	
+	@property
+	def transacoes(self, transacao):
+		return self._transacoes
+	
+	def adicionar_transacao(self, transacao):
+		self._transacoes.append(
+			{
+				"tipo": transacao.__class__.__name__,
+				"valor": transacao.valor,
+				"data": datetime.now().strftime("%d-%m-%Y %H:%M:%s")
+			}
+		)
+	
 
-def atualizarExtrato(opcao, valor, data_E_Hora):    
-    global extrato
-    global numero_saques    
-    global dataEHora 
-    dataEHora = data_E_Hora
-    
-    texto = ""
+class Conta:
+	def __init__(self, numero, cliente):
+		self.numero 	= numero
+		self.agencia 	= "0001"
+		self.cliente  	= cliente
+		self.historico = Historico()
 
-    if opcao == "d":
-        texto = "Depósito: R$ "
-    else:
-        texto = "Saque: R$ "
+	@classmethod
+	def nova_conta(self, cliente, numero):
+		return cls(numero, cliente)
+	
+	@property
+	def saldo(self):
+		return self._saldo
+	
+	@property
+	def numero(self):
+		return self._numero
+	
+	@property
+	def agencia(self):
+		return self._agencia
+	
+	@property
+	def cliente(self):
+		return self._cliente
+	
+	@property
+	def historico(self):
+		return self._historico
+	
+	def sacar(self, valor):
+		if valor <= 0:			
+			print("\n*** O valor informado é inválido. Verifique. ***")
+			return False
+		
+		saldo 		  = self.saldo
+		excedeu_saldo = valor > saldo
+		
+		if excedeu_saldo:
+			print("\n*** Você não tem saldo suficiente para a operação. ***")
+			return False
+		else:
+			saldo -+ valor
+			print("\n*** Saque efetuado com sucesso. ***")
+			return True
 
-    dt = data_E_Hora.strftime("%d/%m/%Y %H:%M")        
+		
+	def depositar(self, valor):
+		if valor <= 0:
+			print("\n*** O valor informado é inválido. Verifique. ***")
+			return False
+		
+		self.saldo += valor
+		print("\n*** Depósito efetuado com sucesso. ***")
+		return True
 
-    extrato += f"{texto} {valor:.2f}  {dt}\n"        
-    
-    if(data_E_Hora.date() != dataEHora.date()):
-        numero_saques = 1
-    else:
-        numero_saques += 1
+	
+class Conta_Corrente(Conta):
+	def __init__(self, numero, agencia, cliente, historico, limite=700, limite_saque=5):
+		super().__init__(numero, cliente)
 
-def imprimirExtrato():
-    print("\n================= EXTRATO =================")
-    print("Não foram realizadas movimentações." if not extrato else extrato)
-    print(f"Limite de transações por dia dia: {LIMITE_SAQUES}.")
-    print(f"Quantidade de transações efetuados no dia: {numero_saques}.")
-    print(f"\nSaldo: R$ {saldo:.2f}")
-    print("=============================================")
-        
-def sair():
-    exit()
+		self.limite 		= limite
+		self.limite_saque = limite_saque
 
-while True:
+	def sacar(self, valor):
+		numero_saque = len([Transacao for transacao in self.historico.transacoes if transacao["tipo"] == Saque.__name__])
 
-    opcao = input(menu)
+		excedeu_limite = valor > self.limite
+		excedeu_saque  = numero_saque >= self.limite_saque
 
-    if (opcao == "d") or (opcao == "s"):
-        valor = float(input("Informe o valor para a operação: "))
+		if excedeu_limite:
+			print("\n*** O valor informado excede o valor limite. ***")
+			return False
 
-        if valor < 1:
-            print("O valor deve ser maior que zero.")
-            continue
+		if excedeu_saque:
+			print(f"\n*** Você já usou o limite de saques diário: {self.limite_saque}. ***")
+			return False	
 
-        if (opcao == "s"):            
-            if excedeuQtdeLimiteDeSaques(numero_saques):
-                print("Você excedeu o limite de saques de hoje. O sistema foi fechado.")
-                sair()
-            if excedeOValorLimiteDeSaque(valor):
-                print(f"O valor excede o valor limite para saque em  R$ {valor - limiteDeSaque}.")
-                continue
-            if excedeOValorDoSaldo(valor):
-                print(f"O valor excede o limite do saldo em  R$ {valor - saldo}.")
-                continue    
+		return super().sacar(valor)			
+	
+	def __str__(self):
+		return f"""\
+			Agência:\t{self.agencia}
+			C/C:\t\t{self.numero}
+			Titulo:\t{self.cliente.nome}
+		"""
+		
 
-        print(dataEHora.date())
-        transacoes(opcao, valor)
-                
-        dataEHoraAtual = datetime.datetime.today()
-        print(dataEHoraAtual.date())
+class Cliente:
+	def __init__(self, endereco):
+		self.endereco = endereco
+		self.contas   = []
 
-        atualizarExtrato(opcao, valor, dataEHoraAtual)
+	def realizar_transacao(self, conta, transacao):
+		transacao.registrar(conta)
 
-    elif opcao == "e":
-        imprimirExtrato() 
+	def adicionar_conta(self, conta):
+		self.contas.append(conta)
 
-    elif opcao == "q":
-        sair()
+	@property
+	def endereco(self):
+		return self._endereco
+	
+	@property
+	def contas(self):
+		return self._contas
 
-    else:
-        print("Opção inválida. Informe uma das opções do menu para efetuar transações ou sair.")        
+
+class Pessoa_Fisica(Cliente):
+	def __init__(self, nome, cpf, data_nascimento, endereco):
+		super().__init__(endereco)
+		self.nome 				= nome
+		self.cpf  				= cpf
+		self.data_nascimento = data_nascimento
+
+	def nome(self):
+		return self._nome
+
+	def cpf(self):
+		return self._cpf
+
+	def data_nascimento(self):
+		return self._data_nascimento
